@@ -1,0 +1,66 @@
+# ============================================================================
+# Operaciones de prueba para http://localhost:8000/graphql (GraphiQL)
+# Pega UNA operación a la vez. Cambia los ids por los de tu base.
+# Atajo: `python scripts/preparar_evidencias.py` imprime todo con ids reales.
+# ============================================================================
+
+# ---- Catálogos -------------------------------------------------------------
+query Roles { roles { id code name isActive } }
+query Permisos { permissions { id code name isActive } }
+query PermisosDelRol { rolePermissions(roleId: "3") { permission { code } isActive } }
+
+# ---- Base: empresa y administrador principal (isAdmin + rol ADMINISTRADOR) --
+mutation CrearEmpresa { createCompany(name: "Mi Empresa") { id name } }
+
+mutation CrearAdmin {
+  createCompanyAdmin(input: { companyId: "1", name: "Ana Admin",
+    email: "admin@miempresa.com", password: "Secreta123" }) {
+    id isAdmin role { code } }
+}
+
+mutation Login { login(email: "admin@miempresa.com", password: "Secreta123") { token user { id name email } } }
+
+# ---- Usuarios y roles (los ejecuta el administrador) -----------------------
+mutation CrearUsuario {
+  createCompanyUser(input: { actorCompanyUserId: "1", name: "Carlos",
+    email: "carlos@miempresa.com", password: "Secreta123" }) { id isActive role { code } }
+}
+
+mutation AsignarRol {
+  assignRole(input: { actorCompanyUserId: "1", companyUserId: "2", roleId: "3" }) {
+    isActive role { code } }
+}
+
+query Usuarios { companyUsers(actorCompanyUserId: "1") { id isAdmin isActive user { email } role { code } } }
+
+mutation DesactivarUsuario { deactivateCompanyUser(actorCompanyUserId: "1", companyUserId: "2") { id isActive } }
+
+# ---- Permisos por rol (roles.write) -----------------------------------------
+mutation AsignarPermisoARol {
+  assignPermissionToRole(input: { actorCompanyUserId: "1", roleId: "3", permissionId: "4" }) {
+    isActive role { code } permission { code } }
+}
+
+mutation QuitarPermisoDeRol { removePermissionFromRole(actorCompanyUserId: "1", roleId: "3", permissionId: "4") }
+
+# ---- Catálogo del negocio ----------------------------------------------------
+mutation CrearCuenta { createAccount(input: { actorCompanyUserId: "2", name: "Caja" }) { id name balance } }
+
+mutation CrearConcepto { createConcept(input: { actorCompanyUserId: "2", name: "Ventas", type: INCOME }) { id name type } }
+
+mutation AsignarConcepto { assignConceptToAccount(input: { actorCompanyUserId: "2", accountId: "1", conceptId: "1" }) { id isActive } }
+
+# ---- Movimientos ------------------------------------------------------------
+mutation RegistrarMovimiento {
+  createTransaction(input: { actorCompanyUserId: "3", accountId: "1", conceptId: "1",
+    type: INCOME, amount: 1500, description: "Venta" }) { id amount type companyUserId }
+}
+
+query Cuentas { accounts(actorCompanyUserId: "3") { id name balance } }
+query Conceptos { concepts(actorCompanyUserId: "3") { id name type } }
+query Movimientos { transactions(actorCompanyUserId: "3") { id accountId amount type companyUserId } }
+
+# ---- Catálogos (administración; no piden actor según el esquema del documento)
+mutation CrearRol { createRole(input: { code: "AUDITOR", name: "Auditor", description: "Ejemplo" }) { id code } }
+mutation DesactivarRol { deactivateRole(id: "5") { id isActive } }
+mutation CrearPermiso { createPermission(input: { code: "reports.read", name: "Ver reportes" }) { id code } }
